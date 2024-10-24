@@ -1,0 +1,7 @@
+train: /Strawberry/MeiliSun/Python/yolov8/work_1/v8_ripe_baseline/ultralytics/datasets/Strawberry_yolo_ripeness-v2.0/images/train 
+val: /Strawberry/MeiliSun/Python/yolov8/work_1/v8_ripe_baseline/ultralytics/datasets/Strawberry_yolo_ripeness-v2.0/images/val
+
+# Classes
+names:
+  0: strawberry
+
