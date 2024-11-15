@@ -64,7 +64,7 @@ retina_masks: False  # (bool) use high-resolution segmentation masks
 # Visualize settings ---------------------------------------------------------------------------------------------------
 show: False  # (bool) show predicted images and videos if environment allows
 save_frames: False  # (bool) save predicted individual video frames
-save_txt: True #False  # (bool) save results as .txt file
+save_txt: False #True  # (bool) save results as .txt file
 save_conf: False  # (bool) save results with confidence scores
 save_crop: False  # (bool) save cropped images with results
 show_labels: True  # (bool) show prediction labels, i.e. 'person'
