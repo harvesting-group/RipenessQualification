@@ -29,6 +29,8 @@ model = YOLO('RCE-Net.pt')
 source = './LightStrawberry/images/val'
 results = model(source, mode='predict', save=True,show_labels=True,save_txt = True)  # list of Results objects 
 
+inference
+python rcenet_w_retinexnet_inference.py
 
 
 
