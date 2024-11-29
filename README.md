@@ -3,6 +3,16 @@
 RCE-Net and RCE-Net w RetinexNet are based on YOLOv8(https://github.com/ultralytics/ultralytics) and RetinexNet(https://github.com/aasharma90/RetinexNet_PyTorch). RCE-Net is an end-to-end detection, segmentation, and ripeness network based on the yolov8.
 RetinexNet is introduced into RCE-Net to alleviate the effects of various light intensities. 
 
+##Download
+```python
+git clone https://github.com/harvesting-group/RCE-Net-w-RetinexNet.git
+```
+## Envrionment 
+```python
+conda create -n rcenet python=3.9 -y
+conda activate rcenet
+pip install ultralytics
+```
 ## Demo
 ### Training
 ```python  
