@@ -4,7 +4,7 @@ A fine-grained ripeness qualification network is proposed, termed as RCE-Net and
 
 ## Download
 ```python
-git clone https://github.com/harvesting-group/RCE-Net-w-RetinexNet.git
+git clone https://github.com/harvesting-group/RipenessQualification.git
 ```
 ## Envrionment 
 ```python
