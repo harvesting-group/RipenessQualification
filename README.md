@@ -2,9 +2,6 @@
 
 A fine-grained ripeness qualification network is proposed, termed as RCE-Net and RCE-Net with RetinexNet. These methods are based on YOLOv8(https://github.com/ultralytics/ultralytics) and RetinexNet(https://github.com/aasharma90/RetinexNet_PyTorch). RCE-Net is an end-to-end detection, segmentation, and ripeness network based on the yolov8. RetinexNet is introduced into RCE-Net to alleviate the effects of various light intensities. 
 
-## Dataset
-[LightStrawberry](https://1drv.ms/f/s!AiiOmEgnYIvmj_8D1ucFNEEh10En0A?e=Cqr7Tx "LightStrawberry") 
-
 ## Download
 ```python
 git clone https://github.com/harvesting-group/RCE-Net-w-RetinexNet.git
@@ -46,5 +43,5 @@ python rcenet_w_retinexnet_inference.py
 ```
 ### Weights
 
-[Weights](https://1drv.ms/f/s!AiiOmEgnYIvmkKVPxPFbYt2emluGKg?e=FbdFp1 "Weights") 
+
 
