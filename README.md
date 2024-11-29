@@ -1,6 +1,8 @@
 # Light-Resilient Visual Estimation of Strawberry Ripeness Levels for Robotic Harvesting
 
-A fine-grained ripeness qualification network is proposed, termed as RCE-Net and RCE-Net with RetinexNet. These methods are based on YOLOv8(https://github.com/ultralytics/ultralytics) and RetinexNet(https://github.com/aasharma90/RetinexNet_PyTorch). RCE-Net is an end-to-end detection, segmentation, and ripeness network based on the yolov8. RetinexNet is introduced into RCE-Net to alleviate the effects of various light intensities. 
+A fine-grained ripeness qualification network is proposed, termed as RCE-Net and RCE-Net with RetinexNet. These methods are based on [YOLOv8](https://github.com/ultralytics/ultralytics,'yolov8') and [RetinexNet](https://github.com/aasharma90/RetinexNet_PyTorch,'RetinexNet'). RCE-Net is an end-to-end detection, segmentation, and ripeness network based on the yolov8. RetinexNet is introduced into RCE-Net to alleviate the effects of various light intensities. 
+## Dataset
+[LightStrawberry](https://1drv.ms/f/s!AiiOmEgnYIvmj_8D1ucFNEEh10En0A?e=Cqr7Tx "LightStrawberry") 
 
 ## Download
 ```python
