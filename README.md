@@ -6,21 +6,28 @@ RetinexNet is introduced into RCE-Net to alleviate the effects of various light 
 Install
 git clone https://github.com/ultralytics/ultralytics.git
 
-Training
+
 Demo
+Training
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
 
 import sys
-sys.path.append('./ultralytics-8.0.221') # 自己的文件夹
+sys.path.append('./ultralytics-8.0.221') 
 
 from ultralytics import YOLO
 model = YOLO("ultralytics/cfg/models/v8/yolov8n-ripe.yaml")  # build a new model from scratch
-
 model.train(data="ultralytics/datasets/LightStrawberry.yaml", epochs=1000, device='0')  # train the model 7.5 MSE
 metrics = model.val()  # evaluate model performance on the validation set
 
+Validation
+import sys
+sys.path.append('/media/strawberry/HP P500/paper-1/v8_ripe_baseline/ultralytics-8.0.221') 
+from ultralytics import YOLO
 
+model = YOLO('RCE-Net.pt')
+source = './LightStrawberry/images/val'
+results = model(source, mode='predict', save=True,show_labels=True,save_txt = True)  # list of Results objects 
 
 
 
