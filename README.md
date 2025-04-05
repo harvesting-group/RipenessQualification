@@ -1,6 +1,6 @@
 # Light-Resilient Visual Estimation of Strawberry Ripeness Levels for Robotic Harvesting
 
-A fine-grained ripeness qualification network is proposed, termed as RCE-Net and RCE-Net with RetinexNet. These methods are based on [YOLOv8](https://github.com/ultralytics/ultralytics,'yolov8') and [RetinexNet](https://github.com/aasharma90/RetinexNet_PyTorch,'RetinexNet'). RCE-Net is an end-to-end detection, segmentation, and ripeness network based on the yolov8. RetinexNet is introduced into RCE-Net to alleviate the effects of various light intensities. 
+A fine-grained ripeness qualification network is proposed, termed as RCE-Net and RCE-Net with RetinexNet. These methods are based on [YOLOv8/YOLOv11](https://github.com/ultralytics/ultralytics,'yolov8') and [RetinexNet](https://github.com/aasharma90/RetinexNet_PyTorch,'RetinexNet'). RCE-Net is an end-to-end detection, segmentation, and ripeness network based on the yolov8. RetinexNet is introduced into RCE-Net to alleviate the effects of various light intensities. 
 
 ## Download
 ```python
@@ -19,7 +19,7 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
 
 import sys
-sys.path.append('./ultralytics-8.0.221') 
+sys.path.append('./ultralytics-8.3.0') 
 
 from ultralytics import YOLO
 model = YOLO("ultralytics/cfg/models/v8/yolov8n-ripe.yaml")  # build a new model from scratch
@@ -29,7 +29,7 @@ metrics = model.val()  # evaluate model performance on the validation set
 ### Validation
 ```python
 import sys
-sys.path.append('/media/strawberry/HP P500/paper-1/v8_ripe_baseline/ultralytics-8.0.221') 
+sys.path.append('/media/strawberry/HP P500/paper-1/v8_ripe_baseline/ultralytics-8.3.0') 
 from ultralytics import YOLO
 
 model = YOLO('RCE-Net.pt')
