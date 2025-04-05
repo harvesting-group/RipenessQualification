@@ -4,4 +4,4 @@ from .predict import RipenessPredictor
 from .train import RipenessTrainer
 from .val import RipenessValidator
 
-__all__ = 'RipenessPredictor', 'RipenessTrainer', 'RipenessValidator'
+__all__ = "RipenessPredictor", "RipenessTrainer", "RipenessValidator"

@@ -12,21 +12,21 @@ from ultralytics.utils import LOGGER, NUM_THREADS, ops
 from ultralytics.utils.checks import check_requirements
 from ultralytics.utils.metrics import RipenessMetrics, box_iou, mask_iou
 from ultralytics.utils.plotting import output_to_target, plot_images
-from ultralytics.models import yolo
 
 
-class RipenessValidator(yolo.detect.DetectionValidator):
+class RipenessValidator(DetectionValidator):
     def __init__(self, dataloader=None, save_dir=None, pbar=None, args=None, _callbacks=None):
+        """Initialize SegmentationValidator and set task to 'segment', metrics to SegmentMetrics."""
         super().__init__(dataloader, save_dir, pbar, args, _callbacks)
         self.plot_masks = None
         self.process = None
-        self.args.task = "ripe" #'ripe'
+        self.args.task = "ripe"
         self.metrics = RipenessMetrics(save_dir=self.save_dir, on_plot=self.on_plot)
-    
+
     def preprocess(self, batch):
         """Preprocesses batch by converting masks to float and sending to device."""
         batch = super().preprocess(batch)
-        batch['masks'] = batch['masks'].to(self.device).float()
+        batch["masks"] = batch["masks"].to(self.device).float()
         batch['ripeness'] = batch['ripeness'].to(self.device).float()
         return batch
 
@@ -35,10 +35,10 @@ class RipenessValidator(yolo.detect.DetectionValidator):
         super().init_metrics(model)
         self.plot_masks = []
         if self.args.save_json:
-            check_requirements('pycocotools>=2.0.6')
-            self.process = ops.process_mask_upsample  # more accurate
-        else:
-            self.process = ops.process_mask  # faster
+            check_requirements("pycocotools>=2.0.6")
+        # more accurate vs faster
+        self.process = ops.process_mask_native if self.args.save_json or self.args.save_txt else ops.process_mask
+        self.stats = dict(tp_m=[], tp=[], conf=[], pred_cls=[], target_cls=[], target_img=[])
 
     def get_desc(self):
         """Return a formatted description of evaluation metrics."""
@@ -58,142 +58,152 @@ class RipenessValidator(yolo.detect.DetectionValidator):
 
     def postprocess(self, preds):
         """Post-processes YOLO predictions and returns output detections with proto."""
-        # p = ops.non_max_suppression(
-        #     preds[0],
-        #     self.args.conf,
-        #     self.args.iou,
-        #     labels=self.lb,
-        #     multi_label=True,
-        #     agnostic=self.args.single_cls,
-        #     max_det=self.args.max_det,
-        #     nc=self.nc,
-        # )
         p = ops.non_max_suppression_ripeness(
             preds[0],
             self.args.conf,
             self.args.iou,
             labels=self.lb,
             multi_label=True,
-            agnostic=self.args.single_cls,
+            agnostic=self.args.single_cls or self.args.agnostic_nms,
             max_det=self.args.max_det,
             nc=self.nc,
         )
-
         # proto = preds[1][-1] if len(preds[1]) == 3 else preds[1]  # second output is len 3 if pt, but only 1 if exported
         proto = preds[1][-2] if len(preds[1]) == 4 else preds[1]  # second output is len 3 if pt, but only 1 if exported
         return p, proto
 
+    def _prepare_batch(self, si, batch):
+        """Prepares a batch for training or inference by processing images and targets."""
+        prepared_batch = super()._prepare_batch(si, batch)
+        midx = [si] if self.args.overlap_mask else batch["batch_idx"] == si
+        prepared_batch["masks"] = batch["masks"][midx]
+        return prepared_batch
+
+    def _prepare_pred(self, pred, pbatch, proto):
+        """Prepares a batch for training or inference by processing images and targets."""
+        predn = super()._prepare_pred(pred, pbatch)
+        pred_masks = self.process(proto, pred[:, 6:-1], pred[:, :4], shape=pbatch["imgsz"])
+        return predn, pred_masks
+
     def update_metrics(self, preds, batch):
         """Metrics."""
-        #segment version
         for si, (pred, proto) in enumerate(zip(preds[0], preds[1])):
-            idx = batch['batch_idx'] == si
-            cls = batch['cls'][idx]
-            bbox = batch['bboxes'][idx]
-
-            
-            nl,  npr = cls.shape[0], pred.shape[0]  # number of labels, predictions
-            shape = batch['ori_shape'][si]
-
-            correct_masks = torch.zeros(npr, self.niou, dtype=torch.bool, device=self.device)  # init
-            correct_bboxes = torch.zeros(npr, self.niou, dtype=torch.bool, device=self.device)  # init
             self.seen += 1
-
-            if npr == 0: # 如果预测结果中目标数为0
+            npr = len(pred)
+            stat = dict(
+                conf=torch.zeros(0, device=self.device),
+                pred_cls=torch.zeros(0, device=self.device),
+                tp=torch.zeros(npr, self.niou, dtype=torch.bool, device=self.device),
+                tp_m=torch.zeros(npr, self.niou, dtype=torch.bool, device=self.device),
+            )
+            pbatch = self._prepare_batch(si, batch)
+            cls, bbox = pbatch.pop("cls"), pbatch.pop("bbox")
+            nl = len(cls)
+            stat["target_cls"] = cls
+            stat["target_img"] = cls.unique()
+            if npr == 0:
                 if nl:
-                    self.stats.append((correct_bboxes, correct_masks, *torch.zeros(
-                        (2, 0), device=self.device), cls.squeeze(-1), *torch.zeros(
-                        (1, 0), device=self.device)))
-
+                    for k in self.stats.keys():
+                        self.stats[k].append(stat[k])
                     if self.args.plots:
-                        #no enter
-                        self.confusion_matrix.process_batch(detections=None, labels=cls.squeeze(-1)) #update confusion matrix
+                        self.confusion_matrix.process_batch(detections=None, gt_bboxes=bbox, gt_cls=cls)
                 continue
 
             # Masks
-            midx = [si] if self.args.overlap_mask else idx
-            gt_masks = batch['masks'][midx]
-            pred_masks = self.process(proto, pred[:, 6:-1], pred[:, :4], shape=batch['img'][si].shape[1:])
-
+            gt_masks = pbatch.pop("masks")
             # Predictions
             if self.args.single_cls:
                 pred[:, 5] = 0
-                # pred[:, 6] = 0
-            predn = pred.clone()
-            ops.scale_boxes(batch['img'][si].shape[1:], predn[:, :4], shape,
-                            ratio_pad=batch['ratio_pad'][si])  # native-space pred
+            predn, pred_masks = self._prepare_pred(pred, pbatch, proto)
+            stat["conf"] = predn[:, 4]
+            stat["pred_cls"] = predn[:, 5]
 
-            #Evaluate
+            # Evaluate
             if nl:
-                height, width = batch['img'].shape[2:]
-                tbox = ops.xywh2xyxy(bbox) * torch.tensor(
-                    (width, height, width, height), device=self.device)  # target boxes
-                ops.scale_boxes(batch['img'][si].shape[1:], tbox, shape,
-                                ratio_pad=batch['ratio_pad'][si])  # native-space labels
-                labelsn = torch.cat((cls, tbox), 1)  # native-space labels
-                predn_n_ripe = predn[:,:-1]
-                correct_bboxes = self._process_batch(predn_n_ripe, labelsn) #Return correct prediction matrix.
-                correct_masks = self._process_batch(predn_n_ripe,
-                                                    labelsn,
-                                                    pred_masks,
-                                                    gt_masks,
-                                                    overlap=self.args.overlap_mask,
-                                                    masks=True)
+                stat["tp"] = self._process_batch(predn, bbox, cls)
+                stat["tp_m"] = self._process_batch(
+                    predn, bbox, cls, pred_masks, gt_masks, self.args.overlap_mask, masks=True
+                )
                 if self.args.plots:
-                    self.confusion_matrix.process_batch(predn_n_ripe, labelsn)
+                    self.confusion_matrix.process_batch(predn, bbox, cls)
 
-            # self.stats.append((correct_bboxes, correct_masks, pred[:, 4], pred[:, 5], cls.squeeze(-1), pred[:,-1]))
-            self.stats.append((correct_bboxes, correct_masks, pred[:, 4], pred[:, 5], cls.squeeze(-1)))
+            for k in self.stats.keys():
+                self.stats[k].append(stat[k])
 
-            # bbox,mask, pconf, pripe, pcls, tripe, tcls
             pred_masks = torch.as_tensor(pred_masks, dtype=torch.uint8)
             if self.args.plots and self.batch_i < 3:
                 self.plot_masks.append(pred_masks[:15].cpu())  # filter top 15 to plot
 
             # Save
             if self.args.save_json:
-                pred_masks = ops.scale_image(pred_masks.permute(1, 2, 0).contiguous().cpu().numpy(),
-                                             shape,
-                                             ratio_pad=batch['ratio_pad'][si])
-                self.pred_to_json(predn, batch['im_file'][si], pred_masks)
-            # if self.args.save_txt:
-            #     file = self.save_dir / 'labels' / f'{Path(batch["im_file"][si]).stem}.txt'
-            #     self.save_one_txt(predn, self.args.save_conf, shape, file)
-            # if self.args.save_txt:
-            #    self.save_one_txt(predn, self.args.save_conf, shape, file=save_dir / 'labels' / f'{path.stem}.txt')
-
+                self.pred_to_json(
+                    predn,
+                    batch["im_file"][si],
+                    ops.scale_image(
+                        pred_masks.permute(1, 2, 0).contiguous().cpu().numpy(),
+                        pbatch["ori_shape"],
+                        ratio_pad=batch["ratio_pad"][si],
+                    ),
+                )
+            if self.args.save_txt:
+                self.save_one_txt(
+                    predn,
+                    pred_masks,
+                    self.args.save_conf,
+                    pbatch["ori_shape"],
+                    self.save_dir / "labels" / f'{Path(batch["im_file"][si]).stem}.txt',
+                )
 
     def finalize_metrics(self, *args, **kwargs):
         """Sets speed and confusion matrix for evaluation metrics."""
         self.metrics.speed = self.speed
         self.metrics.confusion_matrix = self.confusion_matrix
 
-    def _process_batch(self, detections, labels, pred_masks=None, gt_masks=None, overlap=False, masks=False):
-
+    def _process_batch(self, detections, gt_bboxes, gt_cls, pred_masks=None, gt_masks=None, overlap=False, masks=False):
         """
-        Return correct prediction matrix.
+        Compute correct prediction matrix for a batch based on bounding boxes and optional masks.
 
         Args:
-            detections (array[N, 6]), x1, y1, x2, y2, conf, class
-            labels (array[M, 5]), class, ripeness, x1, y1, x2, y2
+            detections (torch.Tensor): Tensor of shape (N, 6) representing detected bounding boxes and
+                associated confidence scores and class indices. Each row is of the format [x1, y1, x2, y2, conf, class].
+            gt_bboxes (torch.Tensor): Tensor of shape (M, 4) representing ground truth bounding box coordinates.
+                Each row is of the format [x1, y1, x2, y2].
+            gt_cls (torch.Tensor): Tensor of shape (M,) representing ground truth class indices.
+            pred_masks (torch.Tensor | None): Tensor representing predicted masks, if available. The shape should
+                match the ground truth masks.
+            gt_masks (torch.Tensor | None): Tensor of shape (M, H, W) representing ground truth masks, if available.
+            overlap (bool): Flag indicating if overlapping masks should be considered.
+            masks (bool): Flag indicating if the batch contains mask data.
 
         Returns:
-            correct (array[N, 10]), for 10 IoU levels
+            (torch.Tensor): A correct prediction matrix of shape (N, 10), where 10 represents different IoU levels.
+
+        Note:
+            - If `masks` is True, the function computes IoU between predicted and ground truth masks.
+            - If `overlap` is True and `masks` is True, overlapping masks are taken into account when computing IoU.
+
+        Example:
+            ```python
+            detections = torch.tensor([[25, 30, 200, 300, 0.8, 1], [50, 60, 180, 290, 0.75, 0]])
+            gt_bboxes = torch.tensor([[24, 29, 199, 299], [55, 65, 185, 295]])
+            gt_cls = torch.tensor([1, 0])
+            correct_preds = validator._process_batch(detections, gt_bboxes, gt_cls)
+            ```
         """
         if masks:
             if overlap:
-                nl = len(labels)
+                nl = len(gt_cls)
                 index = torch.arange(nl, device=gt_masks.device).view(nl, 1, 1) + 1
                 gt_masks = gt_masks.repeat(nl, 1, 1)  # shape(1,640,640) -> (n,640,640)
                 gt_masks = torch.where(gt_masks == index, 1.0, 0.0)
             if gt_masks.shape[1:] != pred_masks.shape[1:]:
-                gt_masks = F.interpolate(gt_masks[None], pred_masks.shape[1:], mode='bilinear', align_corners=False)[0]
+                gt_masks = F.interpolate(gt_masks[None], pred_masks.shape[1:], mode="bilinear", align_corners=False)[0]
                 gt_masks = gt_masks.gt_(0.5)
             iou = mask_iou(gt_masks.view(gt_masks.shape[0], -1), pred_masks.view(pred_masks.shape[0], -1))
         else:  # boxes
-            iou = box_iou(labels[:, 1:], detections[:, :4])
+            iou = box_iou(gt_bboxes, detections[:, :4])
 
-        return self.match_predictions(detections[:, 5], labels[:, 0], iou)     
+        return self.match_predictions(detections[:, 5], gt_cls, iou)
 
     def plot_val_samples(self, batch, ni):
         """Plots validation samples with bounding box labels."""
@@ -232,7 +242,6 @@ class RipenessValidator(yolo.detect.DetectionValidator):
             names=self.names,
             boxes=predn[:, :6],
             masks=pred_masks,
-            ripeness= predn[:, -1]
         ).save_txt(file, save_conf=save_conf)
 
     def pred_to_json(self, predn, filename, pred_masks):

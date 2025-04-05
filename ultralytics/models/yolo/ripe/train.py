@@ -5,7 +5,7 @@ from copy import copy
 from ultralytics.models import yolo
 from ultralytics.nn.tasks import RipenessModel
 from ultralytics.utils import DEFAULT_CFG, RANK
-from ultralytics.utils.plotting import plot_images, plot_results
+from ultralytics.utils.plotting import plot_images, plot_results, plot_images_ripeness
 
 #
 class RipenessTrainer(yolo.detect.DetectionTrainer):
@@ -31,7 +31,7 @@ class RipenessTrainer(yolo.detect.DetectionTrainer):
 
     def plot_training_samples(self, batch, ni):
         """Creates a plot of training sample images with labels and box coordinates."""
-        plot_images(batch['img'],
+        plot_images_ripeness(batch['img'],
                     batch['batch_idx'],
                     batch['cls'].squeeze(-1),
                     #batch['ripeness'].squeeze(-1),# insert
@@ -40,6 +40,14 @@ class RipenessTrainer(yolo.detect.DetectionTrainer):
                     paths=batch['im_file'],
                     fname=self.save_dir / f'train_batch{ni}.jpg',
                     on_plot=self.on_plot)
+        # plot_images(batch["img"],
+        #             batch["batch_idx"],
+        #             batch["cls"].squeeze(-1),
+        #             batch["bboxes"],
+        #             masks=batch["masks"],
+        #             paths=batch["im_file"],
+        #             fname=self.save_dir / f"train_batch{ni}.jpg",
+        #             on_plot=self.on_plot)
 
 
     def plot_metrics(self):
