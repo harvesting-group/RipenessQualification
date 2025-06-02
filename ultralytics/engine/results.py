@@ -537,11 +537,12 @@ class Results(SimpleClass):
         # Plot Detect results
         if pred_boxes is not None and show_boxes:
             for i, d in enumerate(reversed(pred_boxes)):
+                new_ripeness = reversed(self.ripeness)
                 c, conf, id = int(d.cls), float(d.conf) if conf else None, None if d.id is None else int(d.id.item())
                 name = ("" if id is None else f"id:{id} ") + names[c]
                 # label = (f"{name} {conf:.2f}" if conf else name) if labels else None
                 if pred_boxes is not None:
-                    ripe = float(self.ripeness[i])
+                    ripe = float(new_ripeness[i])
                     label = (f"{name} {ripe:.2f} {conf:.2f}" if conf else name) if labels else None
                 else:
                     label = (f"{name} {conf:.2f}" if conf else name) if labels else None
